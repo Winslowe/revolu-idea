@@ -1,13 +1,11 @@
 """Writer Node - Synthesizes verified findings into a research report."""
 from typing import Any
-from datetime import datetime
-from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
 from ports.llm import LLMPort
 from agents.state import ResearchState
-from domain.models import ResearchReport, ResearchSection, ResearchFinding, Evidence
+from domain.models import ResearchReport, ResearchSection, ResearchFinding
 from domain.causal_models import CausalGraph
 
 

@@ -1,6 +1,5 @@
 """Edge Selector Node - Selects the next edge to investigate."""
 from typing import Any
-from uuid import UUID
 
 from agents.state import ResearchState
 from domain.causal_models import CausalEdge
