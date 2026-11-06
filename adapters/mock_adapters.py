@@ -1,9 +1,7 @@
 """Mock adapters for testing without API costs."""
-import json
-import random
 from datetime import datetime
 from typing import TypeVar, Type
-from uuid import UUID, uuid4
+from uuid import UUID
 from pydantic import BaseModel
 
 from ports.llm import LLMPort
@@ -222,15 +220,15 @@ class MockLLMAdapter(LLMPort):
             data = {}
             for name, field in fields.items():
                 if field.is_required():
-                    if field.annotation == str:
+                    if field.annotation is str:
                         data[name] = f"mock_{name}"
-                    elif field.annotation == int:
+                    elif field.annotation is int:
                         data[name] = 1
-                    elif field.annotation == float:
+                    elif field.annotation is float:
                         data[name] = 0.5
-                    elif field.annotation == bool:
+                    elif field.annotation is bool:
                         data[name] = True
-                    elif field.annotation == list:
+                    elif field.annotation is list:
                         data[name] = []
             return schema(**data)
         except Exception:

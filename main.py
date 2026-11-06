@@ -5,12 +5,12 @@ import argparse
 import warnings
 from datetime import datetime
 
+from container import Container
+from agents.state import create_initial_state
+
 # Filter annoyance warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="duckduckgo_search")
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="adapters.duckduckgo_adapter")
-
-from container import Container
-from agents.state import create_initial_state
 
 
 async def run_research(query: str, container: Container) -> dict:

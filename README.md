@@ -1,150 +1,104 @@
-[![Live Demo](https://img.shields.io/badge/Live%20Demo-Open-2ea44f?style=for-the-badge)](https://jayhemnani9910.github.io/revolu-idea/)
+# Revolu Idea
 
-# CAG Deep Research System
+![A mock run in the terminal: the planner builds a graph, each edge gets a red team, a blue team and a verdict, then the report is saved](docs/demo.gif)
 
-A research CLI on LangGraph. It turns a question into a causal graph, has an adversary and a supporter agent search for evidence on each link, judges them, and writes a report. Ports/adapters layout. Experimental.
-
-![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![LangGraph](https://img.shields.io/badge/LangGraph-orchestration-purple)
-![LangChain](https://img.shields.io/badge/LangChain-LLM-green)
-
-## Live Demo (GitHub Pages)
-
-- https://jayhemnani9910.github.io/revolu-idea/
-
-Enable it via **Settings → Pages**:
-
-- Source: **GitHub Actions**
-
-## Overview
-
-CAG (Causal Analysis Graph) Deep Research breaks a question into variables and cause-effect links. For each link, one agent looks for evidence that it holds and another looks for evidence that it does not. A judge weighs both and marks the link verified, falsified or unclear, and a writer turns the result into a report.
-
-## Key Features
-
-- **Causal planner**: builds a DAG of variables and edges from the question
-- **Adversary + supporter**: search for evidence on each edge in parallel
-- **Judge**: sets VERIFIED / FALSIFIED / UNCLEAR with a confidence
-- **Auditor**: enforces depth and loop limits
-- **One search provider per run**: Tavily, Exa, or DuckDuckGo (falls back to Wikipedia)
-- **Mock LLM + search**: run the whole graph with no keys
-
-## Technology Stack
-
-| Category | Technologies |
-|----------|-------------|
-| **Orchestration** | LangGraph, LangChain Core |
-| **Search** | Tavily, Exa, or DuckDuckGo (one per run) |
-| **LLM** | OpenAI-compatible APIs: GitHub Models, Groq, DeepSeek; mock |
-| **Architecture** | Ports & adapters |
-| **Data** | Pydantic, httpx (async) |
-
-## Quick Start
+A research CLI that turns a question into cause-and-effect claims and makes agents argue each one.
 
 ```bash
-# Clone and install
-git clone https://github.com/jayhemnani9910/revolu-idea.git
-cd revolu-idea
-pip install -r requirements.txt
+git clone https://github.com/jayhemnani9910/revolu-idea.git && cd revolu-idea && pip install -r requirements.txt
+```
 
-# Configure: copy the template, then set LLM_API_KEY (and a search key, or SEARCH_PROVIDER=duckduckgo)
+[![CI](https://github.com/jayhemnani9910/revolu-idea/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/jayhemnani9910/revolu-idea/actions/workflows/ci.yml)
+
+Landing page with an in-browser sample run: https://jayhemnani9910.github.io/revolu-idea/
+
+## Try it
+
+No keys needed. This runs the whole graph on the built-in mock LLM and mock search, like the GIF above:
+
+```bash
+LLM_PROVIDER=mock SEARCH_PROVIDER=mock python main.py "Why do startups fail?"
+```
+
+For a real run, copy the env template, set `LLM_API_KEY`, and pick a search provider:
+
+```bash
 cp .env.example .env
-
-# Run research
 python main.py "What are the latest developments in quantum computing?"
-
-# No keys? Run the whole graph on mock LLM + mock search
-LLM_PROVIDER=mock SEARCH_PROVIDER=mock python main.py "test topic"
+python main.py "your topic" --model gpt-4o
 ```
 
-## Agent Workflow
+The report lands in `output/reports/` as `.md` and `.json`.
+
+## How it works
+
+CAG stands for causal-adversarial graph. It runs as a LangGraph state graph:
 
 ```
-User Query
+User query
     ↓
-[Planner] → causal DAG of variables and edges
+[Planner]   builds a DAG of variables and cause-effect edges
     ↓
-[Auditor] → depth and loop limits
+[Auditor]   checks depth and loop limits
     ↓
-[Selector] → picks the next unverified edge
+[Selector]  picks the next unresolved edge
     ↓
-[Adversary + Supporter] → search for and against the edge, in parallel
+[Adversary + Supporter]  search against and for the edge, at the same time
     ↓
-[Judge] → VERIFIED / FALSIFIED / UNCLEAR, then back to the Auditor
+[Judge]     marks the edge VERIFIED, FALSIFIED or UNCLEAR with a confidence, back to the Auditor
     ↓  (no edges left, or depth reached)
-[Writer] → output/reports/*.md + .json
+[Writer]    output/reports/*.md and .json
 ```
 
-## Architecture
+The adversary (red team) looks for evidence that the link is wrong. The supporter (blue team) looks for evidence that it holds. The two run in parallel with `asyncio.gather`. The judge reads both piles and gives a verdict. An edge left UNCLEAR can be picked again, up to `MAX_INVESTIGATIONS_PER_EDGE` times.
 
-```
-revolu-idea/
-├── domain/           # models.py, causal_models.py, exceptions.py
-├── ports/            # llm.py, search.py, storage.py
-├── adapters/         # openai_compatible, fallback_llm, tavily, exa,
-│                     # duckduckgo, mock adapters + local_storage.py
-├── agents/
-│   ├── state.py
-│   └── nodes/        # causal_planner, edge_selector, adversary,
-│                     # supporter, judge, auditor, writer
-├── graph/            # cag_graph.py (workflow definition)
-├── config/           # settings.py
-├── container.py      # provider wiring
-└── main.py           # CLI entrypoint
-```
+The report has a summary, sections with verdict-tagged findings, a block per causal edge (claim, status, evidence counts, judge reasoning), the method, run stats and limitations.
 
 ## Configuration
 
-Copy `.env.example` to `.env` and configure:
+Everything is read from `.env` (see `.env.example`).
 
-```bash
-# .env file
+| Variable | What it does |
+|----------|--------------|
+| `LLM_PROVIDER` | `github`, `groq`, `deepseek`, any OpenAI-compatible name, or `mock` |
+| `LLM_BASE_URL` | OpenAI-compatible endpoint, e.g. `https://models.inference.ai.azure.com` or `https://api.groq.com/openai/v1` |
+| `LLM_MODEL` | One model, a comma-separated list, or `auto` for the built-in pool (groq and github only) |
+| `LLM_API_KEY` | Key for the LLM endpoint. For GitHub Models, a token with `models:read` |
+| `SEARCH_PROVIDER` | `tavily`, `exa`, `duckduckgo` or `mock`. One provider per run |
+| `TAVILY_API_KEY`, `EXA_API_KEY` | Keys for those search providers. DuckDuckGo needs none |
+| `MAX_RECURSION_DEPTH` | Edge investigations before the writer runs (default 5). Not graph depth |
+| `MAX_INVESTIGATIONS_PER_EDGE` | How often one edge can be retried (default 2) |
+| `OUTPUT_DIR` | Where reports go (default `output`) |
 
-# LLM Provider (pick one)
-# Option 1: GitHub Models (FREE with Copilot subscription)
-LLM_PROVIDER=github
-LLM_BASE_URL=https://models.inference.ai.azure.com
-LLM_MODEL=gpt-4o-mini  # or "auto" for model pool
-LLM_API_KEY=ghp_xxxxx  # GitHub token with models:read scope
+With a list of models, or `auto`, each run starts on the next model in the list and falls back to the others if a call fails. DuckDuckGo falls back to Wikipedia when it returns nothing.
 
-# Option 2: Groq (fast, free tier available)
-# LLM_PROVIDER=groq
-# LLM_BASE_URL=https://api.groq.com/openai/v1
-# LLM_MODEL=auto
-# LLM_API_KEY=gsk_xxxxx
+## Layout
 
-# Search (DuckDuckGo is free, no key needed)
-SEARCH_PROVIDER=duckduckgo
-# TAVILY_API_KEY=tvly-xxxxx  # for premium search
+Ports and adapters. The agents only talk to the interfaces in `ports/`.
 
-# Research parameters
-MAX_RECURSION_DEPTH=5  # edge investigations before the writer runs (not graph depth)
-MAX_INVESTIGATIONS_PER_EDGE=2
+```
+domain/      models.py, causal_models.py, exceptions.py
+ports/       llm.py, search.py, storage.py
+adapters/    openai_compatible, fallback_llm, tavily, exa, duckduckgo, mock, local_storage
+agents/      state.py, nodes/ (causal_planner, edge_selector, adversary, supporter, judge, auditor, writer)
+graph/       cag_graph.py, the LangGraph workflow
+config/      settings.py
+container.py wires the providers together
+main.py      CLI entry point
 ```
 
-### GitHub Models Rate Limits
+## Development
 
-| Model | RPM | RPD | Tokens |
-|-------|-----|-----|--------|
-| gpt-4o-mini | 15 | 150 | 8k in, 4k out |
-| gpt-4o | 10 | 50 | 8k in, 4k out |
+```bash
+pip install pytest ruff
+ruff check .
+python -m pytest -q
+```
 
-## Output
+The test runs the full graph on the mocks, so it needs no keys or network. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Reports are saved to `output/reports/` as `.md` and `.json`:
-- Summary
-- Sections with inline citations and verdict-tagged findings
-- Detailed findings per causal edge
-- Verification status, methodology and limitations
-
-## Use Cases
-
-- Academic literature reviews
-- Competitive intelligence
-- Due diligence and fact-checking
-- Technical content research
-- Policy and market analysis
+This is an experiment. Expect rough edges.
 
 ## License
 
-[MIT License](LICENSE)
+[MIT](LICENSE)

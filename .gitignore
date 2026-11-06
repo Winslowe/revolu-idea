@@ -19,9 +19,8 @@ ENV/
 env/
 
 # Environment variables
-.env
-.env.local
-.env.*.local
+.env*
+!.env.example
 
 # IDE/Editor
 .vscode/
@@ -62,3 +61,8 @@ Thumbs.db
 # /audit outputs
 graphify-out/
 .audit/
+
+# AI assistant config
+AGENTS.md
+.github/copilot-instructions.md
+CLAUDE.md

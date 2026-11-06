@@ -165,5 +165,5 @@ class DuckDuckGoSearchAdapter(SearchPort):
     def _extract_domain(self, url: str) -> str:
         try:
             return url.split("//")[-1].split("/")[0]
-        except:
+        except Exception:
             return "unknown"
